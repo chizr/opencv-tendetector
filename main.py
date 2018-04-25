@@ -55,11 +55,11 @@ def main():
     plt.title('Hough Transform'), plt.xticks([]), plt.yticks([])
 
     bounds = []
-    merge_tolerance_pct = 20
+    merge_tolerance_pct = 5
 
     for dimension, arr in enumerate(rho_by_orientation):
         arr.sort()
-        print(arr)
+        print('Hough {}s'.format('vertical' if dimension == 0 else 'horizontal'), arr)
         min_rho = arr[0]
         max_rho = arr[-1]
         diff_rho = max_rho - min_rho
@@ -67,16 +67,18 @@ def main():
         for i, rho in enumerate(arr):
             if not rho or rho == max_rho:
                 continue
-            next_rho = arr[i + 1]
-            if (next_rho - rho) < (diff_rho * (merge_tolerance_pct / 100)):
-                # merge similar lines
-                avg_rho = (rho + next_rho) / 2
-                arr[i] = avg_rho
-                arr[i + 1] = False
-        rho_by_orientation[dimension] = [r for r in arr if r]
+            acc_rho = rho
+            merge_count = 1
+            for j, comp_rho in enumerate(arr):
+                if abs(comp_rho - rho) < (diff_rho * (merge_tolerance_pct / 100)):
+                    # merge similar lines
+                    acc_rho += comp_rho
+                    merge_count += 1
+                    arr[j] = False
+            arr[i] = acc_rho / merge_count
+        rho_by_orientation[dimension] = [int(r) for r in arr if r]
+        print('Merged {}s'.format('vertical' if dimension == 0 else 'horizontal'), rho_by_orientation[dimension])
 
-    print('verticals', rho_by_orientation[0])
-    print('horizontals', rho_by_orientation[1])
     print('bounds', bounds)
 
     merged_hough = orig_rgb.copy()
