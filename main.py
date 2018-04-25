@@ -70,8 +70,11 @@ def main():
             acc_rho = rho
             merge_count = 1
             for j, comp_rho in enumerate(arr):
+                if i == j:
+                    continue
                 if abs(comp_rho - rho) < (diff_rho * (merge_tolerance_pct / 100)):
                     # merge similar lines
+                    # todo: consider non-linear weighting do de-emphasise very close lines
                     acc_rho += comp_rho
                     merge_count += 1
                     arr[j] = False
