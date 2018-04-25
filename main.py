@@ -4,6 +4,17 @@ import matplotlib.pyplot as plt
 import cv2
 
 
+def add_lines_to_img(img: np.ndarray, rho_arrays, vert_colour=(0, 255, 0), horiz_colour=(0, 255, 0)) -> None:
+    height, width = img.shape[:2]
+    for dimension, arr in enumerate(rho_arrays):
+        vert = dimension == 0
+        for rho_flt in arr:
+            rho = int(rho_flt)
+            p1 = (rho, 0) if vert else (0, rho)
+            p2 = (rho, int(height)) if vert else (int(width), rho)
+            cv2.line(img, p1, p2, vert_colour if vert else horiz_colour, 2)
+
+
 def main():
     img = cv2.imread('tenders.png')
     # cv2 decodes channels as B G R
@@ -26,7 +37,6 @@ def main():
     # vertical, horizontal
     rho_by_orientation = [[], []]
 
-    hough_img = orig_rgb.copy()
     for i in range(0, num_lines):
         for rho, theta in lines[i]:
             rho_degrees = math.floor(theta * 180 / np.pi)
@@ -37,19 +47,9 @@ def main():
                 continue
 
             rho_by_orientation[0 if is_vertical else 1].append(rho)
-            a = np.cos(theta)
-            b = np.sin(theta)
-            x0 = a * rho
-            y0 = b * rho
 
-            x1 = int(x0 + 1000 * (-b))
-            y1 = int(y0 + 1000 * (a))
-            x2 = int(x0 - 1000 * (-b))
-            y2 = int(y0 - 1000 * (a))
-
-            colour = (255, 0, 0) if is_vertical else (0, 0, 255)
-
-            cv2.line(hough_img, (x1, y1), (x2, y2), colour, 2)
+    hough_img = orig_rgb.copy()
+    add_lines_to_img(hough_img, rho_by_orientation, (255, 0, 0), (0, 0, 255))
 
     plt.subplot(223), plt.imshow(hough_img)
     plt.title('Hough Transform'), plt.xticks([]), plt.yticks([])
@@ -82,12 +82,7 @@ def main():
     print('bounds', bounds)
 
     merged_hough = orig_rgb.copy()
-    for dimension, arr in enumerate(rho_by_orientation):
-        for rho_flt in arr:
-            rho = int(rho_flt)
-            p1 = (rho, 0) if dimension == 0 else (0, rho)
-            p2 = (rho, int(height)) if dimension == 0 else (int(width), rho)
-            cv2.line(merged_hough, p1, p2, (0, 255, 0), 2)
+    add_lines_to_img(merged_hough, rho_by_orientation)
 
     plt.subplot(224), plt.imshow(merged_hough)
     plt.title('Hough Transform with Merge'), plt.xticks([]), plt.yticks([])
