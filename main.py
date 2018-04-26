@@ -1,7 +1,44 @@
 import numpy as np
 import math
+import itertools
 import matplotlib.pyplot as plt
 import cv2
+
+
+class Rect:
+    def __init__(self, left_top: tuple, right_bottom: tuple):
+        self.left_top = left_top
+        self.right_bottom = right_bottom
+        self.width = self.right_bottom[0] - self.left_top[0]
+        self.height = self.right_bottom[1] - self.left_top[1]
+
+    def area(self):
+        return self.width * self.height
+
+    def aspect(self):
+        return self.width / self.height
+
+    def is_squareish(self, tolerance=0.25):
+        return 1. + tolerance > self.aspect() > 1. - tolerance
+
+    def is_backwards(self):
+        for i in range(0, 1):
+            if self.left_top[i] > self.right_bottom[i]:
+                return True
+        return False
+
+    def get_cropped_img(self, img):
+        # [Y1:Y2, X1:X2]
+        return img[self.left_top[1]:self.right_bottom[1], self.left_top[0]:self.right_bottom[0]]
+
+    def __str__(self):
+        return 'width: {0}\r\nheight: {1}\r\narea: {2}\r\naspect: {3}\r\nbw: {4}'.format(
+            self.width,
+            self.height,
+            self.area(),
+            self.aspect(),
+            self.is_backwards()
+        )
 
 
 def add_lines_to_img(img: np.ndarray, rho_arrays, vert_colour=(0, 255, 0), horiz_colour=(0, 255, 0)) -> None:
@@ -22,12 +59,14 @@ def main():
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     edges = cv2.Canny(gray, 50, 150, apertureSize=3)
 
+    plt.figure(1)
     plt.subplot(221), plt.imshow(orig_rgb, cmap='gray')
     plt.title('Original Image'), plt.xticks([]), plt.yticks([])
     plt.subplot(222), plt.imshow(edges, cmap='gray')
     plt.title('Edge Image'), plt.xticks([]), plt.yticks([])
 
     height, width = img.shape[:2]
+    canvas = Rect((0, 0), (height, width))
     min_line_len = min(height, width) * 0.66
 
     lines = cv2.HoughLines(edges, 1, np.pi / 180, int(min_line_len))
@@ -90,11 +129,40 @@ def main():
     plt.subplot(224), plt.imshow(merged_hough)
     plt.title('Hough Transform with Merge'), plt.xticks([]), plt.yticks([])
 
+    # verticals are x-co-ordinates
+
+    intersects = list(itertools.product(*rho_by_orientation))
+    all_rects = list(Rect(*args) for args in itertools.permutations(intersects, r=2))
+
+    # todo: investigate whether all tender panels have width > height
+    valid_rects = [r for r in all_rects if
+                   r.area() > canvas.area() / 10 and
+                   r.is_squareish(0.33) and
+                   r.aspect() > 1.]
+
+    valid_rect_areas = [r.area() for r in valid_rects]
+    mu_area = np.average(valid_rect_areas)
+    std_area = np.std(valid_rect_areas)
+    valid_rects = [r for r in valid_rects if abs(r.area() - mu_area) < std_area]
+
+    crops = [r.get_cropped_img(orig_rgb.copy()) for r in valid_rects]
+    crops = [crop for crop in crops if len(crop)]  # todo: figure out why this happens
+
     def quit_figure(event):
         if event.key:
             plt.close(event.canvas.figure)
 
+    plt.figure(1)
     plt.gcf().canvas.mpl_connect('key_press_event', quit_figure)
+
+    plt.figure(2)
+    plot_dims = math.ceil(np.sqrt(len(crops)))
+    for i, img in enumerate(crops):
+        plt.subplot(plot_dims, plot_dims, i + 1), plt.xticks([]), plt.yticks([])
+        try:
+            plt.imshow(img)
+        except ValueError:
+            pass
 
     plt.show()
 
