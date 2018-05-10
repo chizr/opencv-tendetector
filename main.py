@@ -3,7 +3,11 @@ import math
 import itertools
 import matplotlib.pyplot as plt
 import cv2
+from PIL import Image
+from google.cloud import vision
+from google.cloud.vision import types
 
+vision_client = vision.ImageAnnotatorClient()
 
 class Rect:
     def __init__(self, left_top: tuple, right_bottom: tuple):
@@ -157,8 +161,17 @@ def main():
 
     plt.figure(2)
     plot_dims = math.ceil(np.sqrt(len(crops)))
+
     for i, img in enumerate(crops):
         plt.subplot(plot_dims, plot_dims, i + 1), plt.xticks([]), plt.yticks([])
+        img = Image.fromarray(img, 'RGB')
+        path = '{}.png'.format(i)
+        img.save(path)
+        with open(path, 'rb') as image_file:
+            content = image_file.read()
+            response = vision_client.text_detection(image=types.Image(content=content))
+            print('====== IMAGE {} ====='.format(i))
+            print(response.text_annotations[0].description)
         try:
             plt.imshow(img)
         except ValueError:
